@@ -19,9 +19,26 @@
 - 创建实例：新加坡节点，Ubuntu 22.04，vhp-1c-1gb
 
 ### 2. SSH 连接
+
+配置 SSH 别名实现免密快速登录（在本地 Mac 执行）：
+
 ```bash
-ssh root@<your-vps-ip>
+# 生成 SSH 密钥（已有则跳过）
+ssh-keygen -t ed25519
+
+# 上传公钥到 VPS（只需输一次密码）
+ssh-copy-id root@<your-vps-ip>
 ```
+
+在 `~/.ssh/config` 中添加别名：
+```
+Host sg
+  HostName <your-vps-ip>
+  User root
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+之后直接 `ssh sg` 即可免密连接 VPS。
 
 ### 3. 更新系统
 ```bash
@@ -50,24 +67,266 @@ xray uuid
 - [x] 更新系统
 - [x] 安装 Xray
 - [x] 生成 UUID
-- [x] 配置 Xray（VLESS + TLS）
-- [x] 生成自签名证书
+- [x] 配置 Xray（VLESS + TLS）— 已升级为 VLESS + Reality
+- [x] 生成自签名证书 — 升级 Reality 后不再需要
 - [x] 开放防火墙 443 端口
 - [x] 安装本地客户端（Clash Verge Rev）
-- [x] 配置 Clash 规则（仅 Anthropic 流量走代理）
+- [x] 配置 Clash 规则（使用 Loyalsoldier 社区规则集，自动分流）
 - [x] 测试代理连接（curl 返回 HTTP/2 404，cf-ray 显示 SIN ✅）
 - [x] 成功访问 Claude 套餐购买页面（显示 SGD，代理正常）
 - [x] 购买 Claude Pro 套餐（使用 SafePal Fiat24 虚拟卡美元支付成功）
 - [ ] 登录 Claude 并使用 Cowork
+- [x] 升级协议为 VLESS + Reality
+- [x] 配置 SSH 免密登录（`ssh sg` 直连 VPS）
+- [x] 接入 Loyalsoldier 社区分流规则集
 
 ## 本地配置文件
 - Clash 配置：`~/singapore-proxy.yaml`
+- SSH 配置：`~/.ssh/config`（别名 `sg`）
 - 代理端口：`7897`
 
 ## 排错记录
 - Xray 启动成功但 443 端口未监听：原因是 cert.key 权限为 600，nobody 用户无法读取，执行 `chmod 644` 解决
 - Clash 配置 rule-providers 报错：改用内置 GEOSITE 规则避免外部规则集下载问题
 - Clash 节点 Timeout：实际是 Xray 正常运行，通过 `xray run` 手动测试确认端口已绑定
+
+## 升级：从 VLESS + TLS 升级到 VLESS + Reality
+
+### 为什么要升级？
+- **不再需要自签证书**：Reality 伪装为访问真实网站，无需管理证书
+- **抗检测能力最强**：流量特征与正常访问大网站完全一致，DPI 几乎无法识别
+- **性能更好**：XTLS Vision 直接转发 TLS，减少一层加密开销
+- **配置更简单**：不用处理证书权限、过期等问题
+
+### 升级步骤（在 VPS 上执行）
+
+#### 1. SSH 连接到 VPS
+```bash
+ssh root@<your-vps-ip>
+```
+
+#### 2. 确保 Xray 是最新版本
+```bash
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+```
+
+#### 3. 生成 Reality 密钥对
+```bash
+xray x25519
+```
+输出示例：
+```
+Private key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Public key:  YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+```
+**记下这两个值！** Private key 填服务端配置，Public key 填客户端配置。
+
+#### 4. 生成新的 UUID（或沿用旧的）
+```bash
+xray uuid
+```
+
+#### 5. 生成 shortId
+```bash
+openssl rand -hex 8
+```
+
+#### 6. 备份旧配置
+```bash
+cp /usr/local/etc/xray/config.json /usr/local/etc/xray/config.json.bak
+```
+
+#### 7. 写入新配置
+```bash
+cat > /usr/local/etc/xray/config.json << 'EOF'
+{
+    "log": {
+        "loglevel": "warning"
+    },
+    "inbounds": [
+        {
+            "listen": "0.0.0.0",
+            "port": 443,
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "<你的UUID>",
+                        "flow": "xtls-rprx-vision"
+                    }
+                ],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "reality",
+                "realitySettings": {
+                    "dest": "www.microsoft.com:443",
+                    "serverNames": [
+                        "www.microsoft.com",
+                        "microsoft.com"
+                    ],
+                    "privateKey": "<你的Private Key>",
+                    "shortIds": [
+                        "<你的shortId>"
+                    ]
+                }
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom"
+        }
+    ]
+}
+EOF
+```
+
+**替换以下占位符：**
+- `<你的UUID>` → 步骤 4 生成的 UUID
+- `<你的Private Key>` → 步骤 3 生成的 Private key
+- `<你的shortId>` → 步骤 5 生成的 shortId
+
+#### 8. 重启 Xray
+```bash
+systemctl restart xray
+```
+
+#### 9. 检查 Xray 状态
+```bash
+systemctl status xray
+```
+确认状态为 `active (running)`。
+
+#### 10. 确认 443 端口正在监听
+```bash
+ss -tlnp | grep 443
+```
+
+### 更新本地 Clash 客户端配置
+
+升级完服务端后，需要更新 `~/singapore-proxy.yaml`。
+
+使用 [Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules) 社区维护的分流规则集，每日自动更新：
+
+```yaml
+mixed-port: 7897
+allow-lan: false
+mode: rule
+log-level: info
+
+proxies:
+  - name: singapore-vless-reality
+    type: vless
+    server: <your-vps-ip>
+    port: 443
+    uuid: <你的UUID>
+    network: tcp
+    udp: true
+    tls: true
+    flow: xtls-rprx-vision
+    servername: www.microsoft.com
+    reality-opts:
+      public-key: <你的Public Key>
+      short-id: <你的shortId>
+    client-fingerprint: chrome
+
+proxy-groups:
+  - name: proxy
+    type: select
+    proxies:
+      - singapore-vless-reality
+      - DIRECT
+
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt"
+    path: ./ruleset/reject.yaml
+    interval: 86400
+  proxy:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
+    path: ./ruleset/proxy.yaml
+    interval: 86400
+  direct:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt"
+    path: ./ruleset/direct.yaml
+    interval: 86400
+  gfw:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"
+    path: ./ruleset/gfw.yaml
+    interval: 86400
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt"
+    path: ./ruleset/cncidr.yaml
+    interval: 86400
+  private:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt"
+    path: ./ruleset/private.yaml
+    interval: 86400
+
+rules:
+  # AI 服务（优先级最高，确保走代理）
+  - DOMAIN-SUFFIX,anthropic.com,proxy
+  - DOMAIN-SUFFIX,claude.ai,proxy
+  - DOMAIN-SUFFIX,openai.com,proxy
+  - DOMAIN-SUFFIX,chatgpt.com,proxy
+  - DOMAIN-SUFFIX,oaistatic.com,proxy
+  - DOMAIN-SUFFIX,oaiusercontent.com,proxy
+
+  # Loyalsoldier 规则集
+  - RULE-SET,private,DIRECT
+  - RULE-SET,reject,REJECT
+  - RULE-SET,proxy,proxy
+  - RULE-SET,direct,DIRECT
+  - RULE-SET,gfw,proxy
+  - RULE-SET,cncidr,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,DIRECT
+```
+
+**规则集说明：**
+
+| 规则集 | 作用 |
+|-------|------|
+| private | 局域网/私有地址 → 直连 |
+| reject | 广告域名 → 拦截 |
+| proxy | 需要代理的域名（Google、YouTube、Twitter 等） → 代理 |
+| direct | 国内常用域名 → 直连 |
+| gfw | GFW 封锁的域名 → 代理 |
+| cncidr | 中国 IP 段 → 直连 |
+
+**替换以下占位符：**
+- `<your-vps-ip>` → 你的 VPS IP 地址
+- `<你的UUID>` → 与服务端相同的 UUID
+- `<你的Public Key>` → 步骤 3 生成的 **Public key**（注意：服务端用 Private key，客户端用 Public key）
+- `<你的shortId>` → 与服务端相同的 shortId
+
+### 升级后验证
+
+在 Clash Verge Rev 中切换到新配置后，测试：
+```bash
+curl --proxy http://127.0.0.1:7897 -I https://claude.ai
+```
+看到返回 HTTP 响应头即为成功。
+
+### 升级后可以清理的旧文件（在 VPS 上）
+自签证书不再需要了：
+```bash
+rm -f /usr/local/etc/xray/cert.crt /usr/local/etc/xray/cert.key
+```
 
 ## 下一步
 - 登录 Claude 桌面客户端，开始使用 Cowork 功能

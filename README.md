@@ -79,6 +79,8 @@ xray uuid
 - [x] 升级协议为 VLESS + Reality
 - [x] 配置 SSH 免密登录（`ssh sg` 直连 VPS）
 - [x] 接入 Loyalsoldier 社区分流规则集
+- [x] 解决 jsdelivr 被墙问题（rule-providers 通过代理下载）
+- [x] 尝试 Cloudflare WARP 解锁流媒体（失败，已回退）
 
 ## 本地配置文件
 - Clash 配置：`~/singapore-proxy.yaml`
@@ -89,6 +91,9 @@ xray uuid
 - Xray 启动成功但 443 端口未监听：原因是 cert.key 权限为 600，nobody 用户无法读取，执行 `chmod 644` 解决
 - Clash 配置 rule-providers 报错：改用内置 GEOSITE 规则避免外部规则集下载问题
 - Clash 节点 Timeout：实际是 Xray 正常运行，通过 `xray run` 手动测试确认端口已绑定
+- jsdelivr CDN 被墙导致 rule-providers 下载失败：在每个 rule-provider 中添加 `proxy: proxy` 字段，让规则文件通过代理下载（详见下方说明）
+- 流媒体/Gemini 检测不通过：Vultr 数据中心 IP 被 Netflix、Disney+、Google Gemini 等服务封锁，属于 VPS 的 IP 质量限制，非配置问题
+- Cloudflare WARP 解锁尝试失败：在 VPS 上部署了 WARP socks5 代理并让 Google/流媒体流量走 WARP 出口，但 Cloudflare IP 同样被这些服务识别和封锁，最终回退
 
 ## 升级：从 VLESS + TLS 升级到 VLESS + Reality
 
@@ -246,36 +251,42 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt"
     path: ./ruleset/reject.yaml
     interval: 86400
+    proxy: proxy
   proxy:
     type: http
     behavior: domain
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
     path: ./ruleset/proxy.yaml
     interval: 86400
+    proxy: proxy
   direct:
     type: http
     behavior: domain
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt"
     path: ./ruleset/direct.yaml
     interval: 86400
+    proxy: proxy
   gfw:
     type: http
     behavior: domain
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"
     path: ./ruleset/gfw.yaml
     interval: 86400
+    proxy: proxy
   cncidr:
     type: http
     behavior: ipcidr
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt"
     path: ./ruleset/cncidr.yaml
     interval: 86400
+    proxy: proxy
   private:
     type: http
     behavior: domain
     url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt"
     path: ./ruleset/private.yaml
     interval: 86400
+    proxy: proxy
 
 rules:
   # AI 服务（优先级最高，确保走代理）
@@ -374,3 +385,66 @@ rm -f /usr/local/etc/xray/cert.crt /usr/local/etc/xray/cert.key
 **注册 SafePal：**
 - 官网：https://www.safepal.com
 - 推荐码：`399561`（使用推荐码注册可免费开通 Fiat24 虚拟 Mastercard）
+
+## jsdelivr 被墙解决方案
+
+国内无法直接访问 `cdn.jsdelivr.net`，导致 Clash 的 rule-providers 下载失败。
+
+**解决方法**：在每个 rule-provider 配置中添加 `proxy: proxy` 字段，让 Clash 通过代理节点下载规则文件：
+
+```yaml
+rule-providers:
+  proxy:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
+    path: ./ruleset/proxy.yaml
+    interval: 86400
+    proxy: proxy          # 关键：通过代理下载规则文件
+```
+
+这是 Mihomo（Clash Verge Rev 的核心引擎）支持的官方特性。
+
+## Cloudflare WARP 解锁尝试（失败）
+
+### 目的
+尝试通过 WARP 改善 VPS 的出口 IP 质量，解锁 Google Gemini、Netflix 等服务。
+
+### 操作步骤
+1. 在 VPS 上安装 Cloudflare WARP 客户端
+2. 设置为 socks5 代理模式（`127.0.0.1:40000`）
+3. 修改 Xray 配置，添加 WARP 出口和路由规则，让 Google/流媒体流量走 WARP
+
+### 结果
+**失败**。WARP 的出口 IP 虽然是 Cloudflare IP（非数据中心标记），但 Google Gemini、Netflix、YouTube Premium 等服务同样封锁了 Cloudflare 的 IP 段。
+
+### 结论与回退
+- 已将 Xray 配置恢复为原始版本（纯 freedom 出口）
+- WARP 服务已断开并禁用（未卸载，保留在 VPS 上备用）
+- 如需重新启用：`systemctl enable --now warp-svc && warp-cli connect`
+
+### 关于流媒体/AI 服务解锁
+
+| 服务 | 状态 | 原因 |
+|------|------|------|
+| Claude | ✅ 正常 | Anthropic 不封锁数据中心 IP |
+| ChatGPT | ✅ 正常 | OpenAI 对 VPS IP 较宽松 |
+| Google Gemini | ❌ 不可用 | Google 封锁数据中心和 Cloudflare IP |
+| Netflix / Disney+ | ❌ 不可用 | 流媒体严格封锁非住宅 IP |
+| YouTube（普通访问） | ✅ 正常 | 普通观看不受限 |
+| YouTube Premium | ❌ 不可用 | Premium 地区验证严格 |
+
+**如需解锁流媒体/Gemini，需要住宅 IP 代理或专线机场服务，自建 VPS 无法解决。**
+
+## 多用户共享
+
+如果需要给朋友共享代理，只需在 Xray 配置中添加多个用户（UUID）：
+
+```json
+"clients": [
+    { "id": "用户A的UUID", "flow": "xtls-rprx-vision" },
+    { "id": "用户B的UUID", "flow": "xtls-rprx-vision" }
+]
+```
+
+每个用户使用不同的 UUID，共享同一台服务器。$6/月 2TB 流量，几个人日常使用足够。

@@ -101,10 +101,12 @@ xray uuid
 - 确保余额足够（Claude Pro 约 $20 USD）
 
 **从人民币到 SafePal 美元的完整充值流程：**
-1. **币安 C2C 购买 USDC**：在币安 App 使用人民币通过 C2C（场外交易）购买 USDC
-2. **USDC 转账到 SafePal**：将币安中的 USDC 提币到 SafePal 钱包地址（注意选对链，推荐 TRC20 手续费低）
-3. **SafePal 兑换为美元**：在 SafePal App 中将 USDC 兑换为 USD，存入 Fiat24 账户
-4. **用 Fiat24 卡支付**：Fiat24 账户有余额后即可用虚拟卡在 Stripe 支付
+1. **币安 C2C 购买 USDC 和 ETH**：在币安 App 使用人民币通过 C2C 购买 USDC（至少 10 USDC）和少量 ETH（约 0.002 ETH，用于激活和 gas 费）
+2. **转账到 SafePal（必须用 Arbitrum 链）**：将币安中的 USDC 和 ETH 提币到 SafePal 钱包地址，**只能使用 Arbitrum（ARB）链**，不支持其他链
+   - 激活账号需要钱包中有至少 0.002 ETH + 10 USDC（仅用于验证，不扣费）
+3. **SafePal 注册 Fiat24 银行账户**：在 SafePal App 中开通 Fiat24 账户，完成后可获得 10 ARB 奖励
+4. **充值到 Fiat24**：将 USDC 存入 Fiat24 账户，最低 10 USDC，手续费 1%，之后兑换为 USD
+5. **用 Fiat24 卡支付**：Fiat24 账户有余额后即可用虚拟卡在 Stripe 支付
 
 **注册 SafePal：**
 - 官网：https://www.safepal.com

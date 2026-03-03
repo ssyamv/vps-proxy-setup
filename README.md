@@ -93,3 +93,5 @@ xray uuid
 **注册 SafePal：**
 - 官网：https://www.safepal.com
 - 推荐码：`399561`（使用推荐码注册可免费开通 Fiat24 虚拟 Mastercard）
+
+![SafePal 推荐码](21cbd967397d6636a61babc6c67065b9.jpg)

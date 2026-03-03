@@ -94,6 +94,8 @@ xray uuid
 - jsdelivr CDN 被墙导致 rule-providers 下载失败：在每个 rule-provider 中添加 `proxy: proxy` 字段，让规则文件通过代理下载（详见下方说明）
 - 流媒体/Gemini 检测不通过：Vultr 数据中心 IP 被 Netflix、Disney+、Google Gemini 等服务封锁，属于 VPS 的 IP 质量限制，非配置问题
 - Cloudflare WARP 解锁尝试失败：在 VPS 上部署了 WARP socks5 代理并让 Google/流媒体流量走 WARP 出口，但 Cloudflare IP 同样被这些服务识别和封锁，最终回退
+- 浏览器无法访问 GitHub：rule-providers 未加载成功时，GitHub 域名没有匹配到代理规则，走了直连被墙。解决方法：在 rules 中添加常用被墙站点的保底规则，放在 rule-providers 之前
+- Git push 到 GitHub 失败：Git 命令行默认不走系统代理。解决方法：`git config --global http.https://github.com.proxy http://127.0.0.1:7897`，仅对 GitHub 生效
 
 ## 升级：从 VLESS + TLS 升级到 VLESS + Reality
 
@@ -296,6 +298,23 @@ rules:
   - DOMAIN-SUFFIX,chatgpt.com,proxy
   - DOMAIN-SUFFIX,oaistatic.com,proxy
   - DOMAIN-SUFFIX,oaiusercontent.com,proxy
+
+  # 常用被墙站点（保���规则，防止 rule-providers 未加载时无法访问）
+  - DOMAIN-SUFFIX,github.com,proxy
+  - DOMAIN-SUFFIX,githubusercontent.com,proxy
+  - DOMAIN-SUFFIX,github.io,proxy
+  - DOMAIN-SUFFIX,google.com,proxy
+  - DOMAIN-SUFFIX,googleapis.com,proxy
+  - DOMAIN-SUFFIX,googlevideo.com,proxy
+  - DOMAIN-SUFFIX,youtube.com,proxy
+  - DOMAIN-SUFFIX,ytimg.com,proxy
+  - DOMAIN-SUFFIX,twitter.com,proxy
+  - DOMAIN-SUFFIX,x.com,proxy
+  - DOMAIN-SUFFIX,twimg.com,proxy
+  - DOMAIN-SUFFIX,telegram.org,proxy
+  - DOMAIN-SUFFIX,t.me,proxy
+  - DOMAIN-SUFFIX,wikipedia.org,proxy
+  - DOMAIN-SUFFIX,jsdelivr.net,proxy
 
   # Loyalsoldier 规则集
   - RULE-SET,private,DIRECT

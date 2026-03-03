@@ -105,14 +105,13 @@ xray uuid
    - 邀请链接：https://www.bsmkweb.cc/referral/earn-together/refer2earn-usdc/claim?hl=zh-CN&ref=GRO_28502_XEP4R&utm_source=default
    - **iOS 用户注意**：币安 App 在中国区 App Store 不可用，需要切换到海外 Apple ID（如香港、新加坡区）下载
 2. **币安 C2C 购买 USDC 和 ETH**：在币安 App 使用人民币通过 C2C 购买 USDC（至少 10 USDC）和少量 ETH（约 0.002 ETH，用于激活和 gas 费）
-2. **转账到 SafePal（必须用 Arbitrum 链）**：将币安中的 USDC 和 ETH 提币到 SafePal 钱包地址，**只能使用 Arbitrum（ARB）链**，不支持其他链
+3. **转账到 SafePal（必须用 Arbitrum 链）**：将币安中的 USDC 和 ETH 提币到 SafePal 钱包地址，**只能使用 Arbitrum（ARB）链**，不支持其他链
    - 激活账号需要钱包中有至少 0.002 ETH + 10 USDC（仅用于验证，不扣费）
-3. **SafePal 注册 Fiat24 银行账户**：在 SafePal App 中开通 Fiat24 账户，完成后可获得 10 ARB 奖励
-4. **充值到 Fiat24**：将 USDC 存入 Fiat24 账户，最低 10 USDC，手续费 1%，之后兑换为 USD
-5. **用 Fiat24 卡支付**：Fiat24 账户有余额后即可用虚拟卡在 Stripe 支付
+   - **iOS 用户注意**：SafePal App 同样需要海外 Apple ID 才能下载
+4. **SafePal 注册 Fiat24 银行账户**：在 SafePal App 中开通 Fiat24 账户，完成后可获得 10 ARB 奖励
+5. **充值到 Fiat24**：将 USDC 存入 Fiat24 账户，最低 10 USDC，手续费 1%，之后兑换为 USD
+6. **用 Fiat24 卡支付**：Fiat24 账户有余额后即可用虚拟卡在 Stripe 支付
 
 **注册 SafePal：**
 - 官网：https://www.safepal.com
 - 推荐码：`399561`（使用推荐码注册可免费开通 Fiat24 虚拟 Mastercard）
-
-![SafePal 推荐码](21cbd967397d6636a61babc6c67065b9.jpg)

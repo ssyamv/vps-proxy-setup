@@ -89,3 +89,7 @@ xray uuid
 **Fiat24 充值方式：**
 - 通过 SafePal App 将加密货币兑换为 USD/EUR 充值到 Fiat24 账户
 - 确保余额足够（Claude Pro 约 $20 USD）
+
+**注册 SafePal：**
+- 官网：https://www.safepal.com
+- 推荐码：`399561`（使用推荐码注册可免费开通 Fiat24 虚拟 Mastercard）

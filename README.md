@@ -1,26 +1,33 @@
 # VPS 代理搭建记录
 
 ## 目标
-搭建海外 VPS 代理，用于访问 Claude Cowork。
+
+搭建海外 VPS 代理，用于访问 Claude。
 
 ## VPS 信息
-- **服务商**：Vultr
-- **地区**：新加坡
-- **套餐**：vhp-1c-1gb（$6/月，2TB 流量）
-- **系统**：Ubuntu 22.04 LTS
-- **IP**：`<your-vps-ip>`
-- **Hostname**：singapore-proxy-01
 
-## 搭建步骤
+| 项目 | 值 |
+|------|-----|
+| 服务商 | Vultr |
+| 地区 | 新加坡 |
+| 套餐 | vhp-1c-1gb（$6/月，2TB 流量） |
+| 系统 | Ubuntu 22.04 LTS |
+| IP | `<your-vps-ip>` |
+| Hostname | singapore-proxy-01 |
+
+---
+
+## 一、VPS 服务端搭建
 
 ### 1. 购买 VPS
+
 - 注册 Vultr 账号
 - 使用支付宝充值 $10
 - 创建实例：新加坡节点，Ubuntu 22.04，vhp-1c-1gb
 
 ### 2. SSH 连接
 
-配置 SSH 别名实现免密快速登录（在本地 Mac 执行）：
+在本地 Mac 执行，配置免密快速登录：
 
 ```bash
 # 生成 SSH 密钥（已有则跳过）
@@ -31,6 +38,7 @@ ssh-copy-id root@<your-vps-ip>
 ```
 
 在 `~/.ssh/config` 中添加别名：
+
 ```
 Host sg
   HostName <your-vps-ip>
@@ -41,110 +49,43 @@ Host sg
 之后直接 `ssh sg` 即可免密连接 VPS。
 
 ### 3. 更新系统
+
 ```bash
 apt update && apt upgrade -y
 ```
 
 ### 4. 安装 Xray
+
 ```bash
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 ```
 
-### 5. 生成 UUID
+### 5. 生成密钥材料
+
 ```bash
+# 生成 UUID
 xray uuid
-```
 
-### 6. 配置 Xray（待完成）
-配置文件路径：`/usr/local/etc/xray/config.json`
-
-### 7. 配置本地客户端（待完成）
-推荐使用 Clash Verge for macOS
-
-## 进度
-- [x] 购买 VPS
-- [x] SSH 连接
-- [x] 更新系统
-- [x] 安装 Xray
-- [x] 生成 UUID
-- [x] 配置 Xray（VLESS + TLS）— 已升级为 VLESS + Reality
-- [x] 生成自签名证书 — 升级 Reality 后不再需要
-- [x] 开放防火墙 443 端口
-- [x] 安装本地客户端（Clash Verge Rev）
-- [x] 配置 Clash 规则（使用 Loyalsoldier 社区规则集，自动分流）
-- [x] 测试代理连接（curl 返回 HTTP/2 404，cf-ray 显示 SIN ✅）
-- [x] 成功访问 Claude 套餐购买页面（显示 SGD，代理正常）
-- [x] 购买 Claude Pro 套餐（使用 SafePal Fiat24 虚拟卡美元支付成功）
-- [ ] 登录 Claude 并使用 Cowork
-- [x] 升级协议为 VLESS + Reality
-- [x] 配置 SSH 免密登录（`ssh sg` 直连 VPS）
-- [x] 接入 Loyalsoldier 社区分流规则集
-- [x] 解决 jsdelivr 被墙问题（rule-providers 通过代理下载）
-- [x] 尝试 Cloudflare WARP 解锁流媒体（失败，已回退）
-
-## 本地配置文件
-- Clash 配置：`~/singapore-proxy.yaml`
-- SSH 配置：`~/.ssh/config`（别名 `sg`）
-- 代理端口：`7897`
-
-## 排错记录
-- Xray 启动成功但 443 端口未监听：原因是 cert.key 权限为 600，nobody 用户无法读取，执行 `chmod 644` 解决
-- Clash 配置 rule-providers 报错：改用内置 GEOSITE 规则避免外部规则集下载问题
-- Clash 节点 Timeout：实际是 Xray 正常运行，通过 `xray run` 手动测试确认端口已绑定
-- jsdelivr CDN 被墙导致 rule-providers 下载失败：在每个 rule-provider 中添加 `proxy: proxy` 字段，让规则文件通过代理下载（详见下方说明）
-- 流媒体/Gemini 检测不通过：Vultr 数据中心 IP 被 Netflix、Disney+、Google Gemini 等服务封锁，属于 VPS 的 IP 质量限制，非配置问题
-- Cloudflare WARP 解锁尝试失败：在 VPS 上部署了 WARP socks5 代理并让 Google/流媒体流量走 WARP 出口，但 Cloudflare IP 同样被这些服务识别和封锁，最终回退
-- 浏览器无法访问 GitHub：rule-providers 未加载成功时，GitHub 域名没有匹配到代理规则，走了直连被墙。解决方法：在 rules 中添加常用被墙站点的保底规则，放在 rule-providers 之前
-- Git push 到 GitHub 失败：Git 命令行默认不走系统代理。解决方法：`git config --global http.https://github.com.proxy http://127.0.0.1:7897`，仅对 GitHub 生效
-
-## 升级：从 VLESS + TLS 升级到 VLESS + Reality
-
-### 为什么要升级？
-- **不再需要自签证书**：Reality 伪装为访问真实网站，无需管理证书
-- **抗检测能力最强**：流量特征与正常访问大网站完全一致，DPI 几乎无法识别
-- **性能更好**：XTLS Vision 直接转发 TLS，减少一层加密开销
-- **配置更简单**：不用处理证书权限、过期等问题
-
-### 升级步骤（在 VPS 上执行）
-
-#### 1. SSH 连接到 VPS
-```bash
-ssh root@<your-vps-ip>
-```
-
-#### 2. 确保 Xray 是最新版本
-```bash
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
-```
-
-#### 3. 生成 Reality 密钥对
-```bash
+# 生成 Reality 密钥对（Private key 填服务端，Public key 给客户端）
 xray x25519
-```
-输出示例：
-```
-Private key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-Public key:  YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
-```
-**记下这两个值！** Private key 填服务端配置，Public key 填客户端配置。
 
-#### 4. 生成新的 UUID（或沿用旧的）
-```bash
-xray uuid
-```
-
-#### 5. 生成 shortId
-```bash
+# 生成 shortId
 openssl rand -hex 8
 ```
 
-#### 6. 备份旧配置
-```bash
-cp /usr/local/etc/xray/config.json /usr/local/etc/xray/config.json.bak
-```
+记录以下值，客户端配置时需要用到：
 
-#### 7. 写入新配置
+- UUID
+- Public Key（客户端用）
+- Private Key（服务端用，不外传）
+- Short ID
+
+### 6. 配置 Xray（VLESS + Reality）
+
 ```bash
+# 备份旧配置（如有）
+cp /usr/local/etc/xray/config.json /usr/local/etc/xray/config.json.bak
+
 cat > /usr/local/etc/xray/config.json << 'EOF'
 {
     "log": {
@@ -190,32 +131,36 @@ cat > /usr/local/etc/xray/config.json << 'EOF'
 EOF
 ```
 
-**替换以下占位符：**
-- `<你的UUID>` → 步骤 4 生成的 UUID
-- `<你的Private Key>` → 步骤 3 生成的 Private key
-- `<你的shortId>` → 步骤 5 生成的 shortId
+多用户共享时，在 `clients` 数组中添加多个 UUID：
 
-#### 8. 重启 Xray
+```json
+"clients": [
+    { "id": "用户A的UUID", "flow": "xtls-rprx-vision" },
+    { "id": "用户B的UUID", "flow": "xtls-rprx-vision" }
+]
+```
+
+### 7. 启动并验证
+
 ```bash
 systemctl restart xray
+systemctl status xray       # 确认 active (running)
+ss -tlnp | grep 443         # 确认 443 端口在监听
 ```
 
-#### 9. 检查 Xray 状态
-```bash
-systemctl status xray
-```
-确认状态为 `active (running)`。
+---
 
-#### 10. 确认 443 端口正在监听
-```bash
-ss -tlnp | grep 443
-```
+## 二、本地客户端配置
 
-### 更新本地 Clash 客户端配置
+> **重要提示：**
+> - **浏览器访问 claude.ai**：只需 mixed-port 模式即可
+> - **Claude 桌面应用 + Claude Cowork 功能**：需要开启 Clash 的 TUN 模式，否则 Cowork 无法连接
 
-升级完服务端后，需要更新 `~/singapore-proxy.yaml`。
+### 方案 A：仅使用自建 VPS（独立配置）
 
-使用 [Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules) 社区维护的分流规则集，每日自动更新：
+适合没有第三方 VPN 订阅的场景。配置文件 `~/singapore-proxy.yaml`（含敏感信息，已加入 .gitignore）。
+
+使用 [Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules) 社区维护的分流规则集：
 
 ```yaml
 mixed-port: 7897
@@ -224,7 +169,7 @@ mode: rule
 log-level: info
 
 proxies:
-  - name: singapore-vless-reality
+  - name: SG-新加坡VPS
     type: vless
     server: <your-vps-ip>
     port: 443
@@ -243,7 +188,7 @@ proxy-groups:
   - name: proxy
     type: select
     proxies:
-      - singapore-vless-reality
+      - SG-新加坡VPS
       - DIRECT
 
 rule-providers:
@@ -291,32 +236,15 @@ rule-providers:
     proxy: proxy
 
 rules:
-  # AI 服务（优先级最高，确保走代理）
   - DOMAIN-SUFFIX,anthropic.com,proxy
   - DOMAIN-SUFFIX,claude.ai,proxy
   - DOMAIN-SUFFIX,openai.com,proxy
-  - DOMAIN-SUFFIX,chatgpt.com,proxy
-  - DOMAIN-SUFFIX,oaistatic.com,proxy
-  - DOMAIN-SUFFIX,oaiusercontent.com,proxy
-
-  # 常用被墙站点（保���规则，防止 rule-providers 未加载时无法访问）
   - DOMAIN-SUFFIX,github.com,proxy
   - DOMAIN-SUFFIX,githubusercontent.com,proxy
-  - DOMAIN-SUFFIX,github.io,proxy
   - DOMAIN-SUFFIX,google.com,proxy
-  - DOMAIN-SUFFIX,googleapis.com,proxy
-  - DOMAIN-SUFFIX,googlevideo.com,proxy
   - DOMAIN-SUFFIX,youtube.com,proxy
-  - DOMAIN-SUFFIX,ytimg.com,proxy
-  - DOMAIN-SUFFIX,twitter.com,proxy
-  - DOMAIN-SUFFIX,x.com,proxy
-  - DOMAIN-SUFFIX,twimg.com,proxy
   - DOMAIN-SUFFIX,telegram.org,proxy
-  - DOMAIN-SUFFIX,t.me,proxy
-  - DOMAIN-SUFFIX,wikipedia.org,proxy
   - DOMAIN-SUFFIX,jsdelivr.net,proxy
-
-  # Loyalsoldier 规则集
   - RULE-SET,private,DIRECT
   - RULE-SET,reject,REJECT
   - RULE-SET,proxy,proxy
@@ -327,143 +255,175 @@ rules:
   - MATCH,DIRECT
 ```
 
-**规则集说明：**
+验证：
 
-| 规则集 | 作用 |
-|-------|------|
-| private | 局域网/私有地址 → 直连 |
-| reject | 广告域名 → 拦截 |
-| proxy | 需要代理的域名（Google、YouTube、Twitter 等） → 代理 |
-| direct | 国内常用域名 → 直连 |
-| gfw | GFW 封锁的域名 → 代理 |
-| cncidr | 中国 IP 段 → 直连 |
-
-**替换以下占位符：**
-- `<your-vps-ip>` → 你的 VPS IP 地址
-- `<你的UUID>` → 与服务端相同的 UUID
-- `<你的Public Key>` → 步骤 3 生成的 **Public key**（注意：服务端用 Private key，客户端用 Public key）
-- `<你的shortId>` → 与服务端相同的 shortId
-
-### 升级后验证
-
-在 Clash Verge Rev 中切换到新配置后，测试：
 ```bash
 curl --proxy http://127.0.0.1:7897 -I https://claude.ai
 ```
-看到返回 HTTP 响应头即为成功。
 
-### 升级后可以清理的旧文件（在 VPS 上）
-自签证书不再需要了：
-```bash
-rm -f /usr/local/etc/xray/cert.crt /usr/local/etc/xray/cert.key
-```
+### 方案 B：已有第三方 VPN 订阅，仅让 Claude 走自建 VPS
 
-## 下一步
-- 登录 Claude 桌面客户端，开始使用 Cowork 功能
+适合日常使用第三方订阅、只希望 Claude 强制走自建 VPS 的场景。日常流量继续走第三方订阅，访问 Claude 时自动切到自建 VPS，无需手动切换。
 
-## 支付经验记录
+**前提条件：**
 
-### 注册 Claude 账号
-1. **确保代理已开启**：全程使用新加坡 VPS 代理，避免使用中国 IP
-2. **准备邮箱**：使用境外邮箱（Gmail 等）注册
-3. **手机验证码**：Claude 注册需要境外手机号，使用接码平台 [5sim](https://5sim.net) 解决
-   - 在 5sim 充值少量余额（约 $1）
-   - 购买一个境外虚拟号码接收短信验证码
-4. **完成注册**：填写邮箱、设置密码、输入验证码，全程顺利
+- 已安装 [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev/releases)
+- 已在 Clash Verge 中导入第三方 VPN 订阅并能正常使用
 
+**节点参数：**
 
+| 参数 | 值 |
+|------|-----|
+| 服务器地址 | `<your-vps-ip>` |
+| 端口 | `443` |
+| UUID | `<你的UUID>` |
+| 协议 | VLESS + REALITY |
+| 传输 | TCP |
+| Flow | xtls-rprx-vision |
+| SNI | `www.microsoft.com` |
+| 客户端指纹 | chrome |
+| Public Key | `<你的Public Key>` |
+| Short ID | `<你的shortId>` |
 
-### Claude Pro 订阅支付
-- **套餐**：Claude Pro，SGD 25/月
-- **支付工具**：SafePal 内置的 Fiat24 虚拟 Visa 卡
-- **币种**：美元（USD）
-- **结果**：支付成功
+#### 第一步：找到订阅对应的扩展文件
 
-**踩坑记录：**
-- 香港汇丰 Visa 卡（人民币账户）被 Stripe 拒绝，原因可能是跨境风控或账单地址不匹配
-- Stripe 地区列表中没有 Hong Kong 选项，填新加坡地址也无效
-- Fiat24 是瑞士数字银行发行的真实 Visa 卡，Stripe 可以正常支付
-- Country 选 Switzerland，填瑞士地址即可
+1. 打开 Clash Verge，点击左侧「**订阅**」
+2. 找到日常使用的 VPN 订阅，鼠标悬停后点击「**···**」菜单
+3. 选择「**扩展配置**」（可见四个选项：Merge、Rules、Proxies、Groups）
 
-**Fiat24 充值方式：**
-- 通过 SafePal App 将加密货币兑换为 USD/EUR 充值到 Fiat24 账户
-- 确保余额足够（Claude Pro 约 $20 USD）
+#### 第二步：配置 Proxies 扩展（注入节点）
 
-**从人民币到 SafePal 美元的完整充值流程：**
-1. **注册币安**：如果还没有币安账号，可以通过以下邀请链接注册（需要科学上网）
-   - 邀请链接：https://www.bsmkweb.cc/referral/earn-together/refer2earn-usdc/claim?hl=zh-CN&ref=GRO_28502_XEP4R&utm_source=default
-   - **iOS 用户注意**：币安 App 在中国区 App Store 不可用，需要切换到海外 Apple ID（如香港、新加坡区）下载
-2. **币安 C2C 购买 USDC 和 ETH**：在币安 App 使用人民币通过 C2C 购买 USDC（至少 10 USDC）和少量 ETH（约 0.002 ETH，用于激活和 gas 费）
-3. **转账到 SafePal（必须用 Arbitrum 链）**：将币安中的 USDC 和 ETH 提币到 SafePal 钱包地址，**只能使用 Arbitrum（ARB）链**，不支持其他链
-   - 激活账号需要钱包中有至少 0.002 ETH + 10 USDC（仅用于验证，不扣费）
-   - **iOS 用户注意**：SafePal App 同样需要海外 Apple ID 才能下载
-4. **SafePal 注册 Fiat24 银行账户**：在 SafePal App 中开通 Fiat24 账户，完成后可获得 10 ARB 奖励
-5. **充值到 Fiat24**：将 USDC 存入 Fiat24 账户，最低 10 USDC，手续费 1%，之后兑换为 USD
-6. **用 Fiat24 卡支付**：Fiat24 账户有余额后即可用虚拟卡在 Stripe 支付
-
-**注册 SafePal：**
-- 官网：https://www.safepal.com
-- 推荐码：`399561`（使用推荐码注册可免费开通 Fiat24 虚拟 Mastercard）
-
-## jsdelivr 被墙解决方案
-
-国内无法直接访问 `cdn.jsdelivr.net`，导致 Clash 的 rule-providers 下载失败。
-
-**解决方法**：在每个 rule-provider 配置中添加 `proxy: proxy` 字段，让 Clash 通过代理节点下载规则文件：
+点击「**Proxies**」右侧的编辑按钮，将内容替换为（把占位符换成实际值）：
 
 ```yaml
-rule-providers:
-  proxy:
-    type: http
-    behavior: domain
-    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
-    path: ./ruleset/proxy.yaml
-    interval: 86400
-    proxy: proxy          # 关键：通过代理下载规则文件
+prepend:
+  - name: SG-新加坡VPS
+    type: vless
+    server: <your-vps-ip>
+    port: 443
+    uuid: <你的UUID>
+    network: tcp
+    tls: true
+    udp: true
+    flow: xtls-rprx-vision
+    servername: www.microsoft.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: <你的Public Key>
+      short-id: <你的shortId>
+
+append: []
+delete: []
 ```
 
-这是 Mihomo（Clash Verge Rev 的核心引擎）支持的官方特性。
+#### 第三步：配置 Rules 扩展（注入分流规则）
 
-## Cloudflare WARP 解锁尝试（失败）
+点击「**Rules**」右侧的编辑按钮，将内容替换为：
 
-### 目的
-尝试通过 WARP 改善 VPS 的出口 IP 质量，解锁 Google Gemini、Netflix 等服务。
+```yaml
+prepend:
+  - DOMAIN-SUFFIX,anthropic.com,SG-新加坡VPS
+  - DOMAIN-SUFFIX,claude.ai,SG-新加坡VPS
+  - DOMAIN-SUFFIX,claudeusercontent.com,SG-新加坡VPS
+  - DOMAIN,api.anthropic.com,SG-新加坡VPS
+  - DOMAIN,statsig.anthropic.com,SG-新加坡VPS
 
-### 操作步骤
-1. 在 VPS 上安装 Cloudflare WARP 客户端
-2. 设置为 socks5 代理模式（`127.0.0.1:40000`）
-3. 修改 Xray 配置，添加 WARP 出口和路由规则，让 Google/流媒体流量走 WARP
+append: []
+delete: []
+```
 
-### 结果
-**失败**。WARP 的出口 IP 虽然是 Cloudflare IP（非数据中心标记），但 Google Gemini、Netflix、YouTube Premium 等服务同样封锁了 Cloudflare 的 IP 段。
+#### 第四步：重新激活订阅
 
-### 结论与回退
-- 已将 Xray 配置恢复为原始版本（纯 freedom 出口）
-- WARP 服务已断开并禁用（未卸载，保留在 VPS 上备用）
-- 如需重新启用：`systemctl enable --now warp-svc && warp-cli connect`
+回到「订阅」页面，点击 VPN 订阅的「**···**」菜单，选择「**激活**」，等待 Clash Verge 重新加载配置。
 
-### 关于流媒体/AI 服务解锁
+**验证：** 在「代理」页面确认节点列表中出现「SG-新加坡VPS」，然后用浏览器访问 [claude.ai](https://claude.ai) 验证连通性。
+
+> **注意：** 规则直接引用节点名 `SG-新加坡VPS`，不经过 proxy-groups。若在 Merge 扩展中使用 `proxy-groups`，会按名称覆盖原有分组的 proxies 列表，导致 `proxy not found` 报错。
+
+---
+
+## 三、进度记录
+
+- [x] 购买 VPS
+- [x] SSH 免密登录（`ssh sg`）
+- [x] 更新系统
+- [x] 安装 Xray
+- [x] 配置 VLESS + Reality
+- [x] 安装本地客户端（Clash Verge Rev）
+- [x] 配置 Clash 分流规则
+- [x] 测试代理连接（SIN 节点正常）
+- [x] 注册 Claude 账号（接码平台 5sim）
+- [x] 购买 Claude Pro（SafePal Fiat24 虚拟卡）
+- [x] 接入 Loyalsoldier 社区分流规则集
+- [x] 解决 jsdelivr 被墙问题
+- [x] 配置第三方订阅 + 自建 VPS 分流并用
+
+---
+
+## 四、排错记录
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| Xray 443 端口未监听 | cert.key 权限 600，nobody 用户无法读取 | `chmod 644`（升级 Reality 后无需证书，此问题已消除） |
+| rule-providers 下载失败 | `cdn.jsdelivr.net` 国内被墙 | 每个 rule-provider 加 `proxy: proxy`，让 Clash 通过代理下载 |
+| 浏览器无法访问 GitHub | rule-providers 未加载时 GitHub 走直连被墙 | 在 rules 靠前位置加保底规则 |
+| Git push 失败 | Git 不走系统代理 | `git config --global http.https://github.com.proxy http://127.0.0.1:7897` |
+| Clash Verge Merge 的 proxy-groups 陷阱 | Merge 中的 proxy-groups 会覆盖原有分组，导致 `proxy not found` | 用 Proxies 扩展注入节点，Rules 扩展注入规则，规则直接引用节点名称 |
+
+---
+
+## 五、支付经验记录
+
+### 注册 Claude 账号
+
+1. 确保全程使用新加坡 VPS 代理，避免使用中国 IP
+2. 使用境外邮箱（Gmail 等）注册
+3. 手机验证码：使用接码平台 [5sim](https://5sim.net)（充值约 $1，购买虚拟号码接收验证码）
+
+### Claude Pro 订阅支付
+
+- **套餐**：Claude Pro，SGD 25/月
+- **支付工具**：SafePal 内置的 Fiat24 虚拟 Visa 卡（瑞士数字银行，Stripe 可正常支付）
+- Country 选 Switzerland，填瑞士地址
+
+**踩坑：**
+
+- 香港汇丰 Visa 卡（人民币账户）被 Stripe 拒绝
+- Stripe 地区列表中没有 Hong Kong，填新加坡地址也无效
+
+**人民币 → SafePal 美元充值流程：**
+
+1. 注册币安，C2C 购买 USDC（至少 10 USDC）和少量 ETH（约 0.002 ETH，用于 gas 费）
+   - iOS 用户需切换海外 Apple ID 下载币安 App
+2. 提币到 SafePal：必须使用 **Arbitrum（ARB）链**
+3. 在 SafePal App 中开通 Fiat24 账户（注册推荐码：`399561`，可免费开通 Fiat24 虚拟 Mastercard，完成后获 10 ARB 奖励）
+   - iOS 用户同样需要海外 Apple ID
+4. 将 USDC 存入 Fiat24（最低 10 USDC，手续费 1%，兑换为 USD）
+5. 用 Fiat24 卡在 Stripe 支付
+
+---
+
+## 六、服务解锁情况
 
 | 服务 | 状态 | 原因 |
 |------|------|------|
-| Claude | ✅ 正常 | Anthropic 不封锁数据中心 IP |
-| ChatGPT | ✅ 正常 | OpenAI 对 VPS IP 较宽松 |
-| Google Gemini | ❌ 不可用 | Google 封锁数据中心和 Cloudflare IP |
-| Netflix / Disney+ | ❌ 不可用 | 流媒体严格封锁非住宅 IP |
-| YouTube（普通访问） | ✅ 正常 | 普通观看不受限 |
-| YouTube Premium | ❌ 不可用 | Premium 地区验证严格 |
+| Claude | 正常 | Anthropic 不封锁数据中心 IP |
+| ChatGPT | 正常 | OpenAI 对 VPS IP 较宽松 |
+| Google Gemini | 不可用 | Google 封锁数据中心和 Cloudflare IP |
+| Netflix / Disney+ | 不可用 | 流媒体严格封锁非住宅 IP |
+| YouTube（普通访问） | 正常 | 普通观看不受限 |
+| YouTube Premium | 不可用 | Premium 地区验证严格 |
 
-**如需解锁流媒体/Gemini，需要住宅 IP 代理或专线机场服务，自建 VPS 无法解决。**
+曾尝试 Cloudflare WARP 改善出口 IP 质量，WARP 的 Cloudflare IP 同样被 Gemini、Netflix 封锁，已回退。
 
-## 多用户共享
+**如需解锁流媒体或 Gemini，需住宅 IP 代理或专线机场，自建 VPS 无法解决。**
 
-如果需要给朋友共享代理，只需在 Xray 配置中添加多个用户（UUID）：
+---
 
-```json
-"clients": [
-    { "id": "用户A的UUID", "flow": "xtls-rprx-vision" },
-    { "id": "用户B的UUID", "flow": "xtls-rprx-vision" }
-]
-```
+## 七、本地文件说明
 
-每个用户使用不同的 UUID，共享同一台服务器。$6/月 2TB 流量，几个人日常使用足够。
+| 文件 | 说明 |
+|------|------|
+| `~/singapore-proxy.yaml` | Clash 独立配置（含敏感信息，已 .gitignore） |
+| `~/code/vps-proxy-setup/dounai-merge.yaml` | 第三方订阅扩展配置草稿（含敏感信息，已 .gitignore） |
+| `~/.ssh/config` | SSH 别名配置（`ssh sg` 直连 VPS） |

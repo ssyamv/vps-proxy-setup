@@ -324,8 +324,13 @@ delete: []
 prepend:
   - DOMAIN-SUFFIX,anthropic.com,SG-新加坡VPS
   - DOMAIN-SUFFIX,claude.ai,SG-新加坡VPS
+  - DOMAIN-SUFFIX,claude.com,SG-新加坡VPS
   - DOMAIN-SUFFIX,claudeusercontent.com,SG-新加坡VPS
+  - DOMAIN-SUFFIX,intercom.io,SG-新加坡VPS
+  - DOMAIN-SUFFIX,pki.goog,SG-新加坡VPS
   - DOMAIN,api.anthropic.com,SG-新加坡VPS
+  - DOMAIN,cdn.anthropic.com,SG-新加坡VPS
+  - DOMAIN,e-cdn.anthropic.com,SG-新加坡VPS
   - DOMAIN,statsig.anthropic.com,SG-新加坡VPS
 
 append: []

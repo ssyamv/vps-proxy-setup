@@ -1,3 +1,4 @@
 # 包含敏感信息（UUID、密钥、服务器 IP），不提交到仓库
 singapore-proxy.yaml
 dounai-merge.yaml
+info.md
